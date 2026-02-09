@@ -79,7 +79,7 @@ Data class representing a chat model's response.
 
 ### ToolAligner
 
-Aligns tool names and arguments using both lexical (fuzzy matching) and semantic (embedding) similarity. Extends the [Aligner](../embeddings/aligner.py) class.
+Aligns tool names and arguments using both lexical (fuzzy matching) and semantic (embedding) similarity. Extends the [Aligner](../embeddings/aligner.py) class. **Located in** [core/chat.py](../core/chat.py).
 
 **Constructor Parameters:**
 - `model_name` (str): Embedding model name

@@ -82,21 +82,39 @@ result = coder.execute_agent(
 ### Custom Agent
 
 ```python
-from pipiline_agent.core.agents import BaseAgent, ResourceUser
-from pipiline_agent.core.resources import resource, LLMFactory
-from typing import Annotated
-
-class MyAgent(ResourceUser, BaseAgent):
+class PythonCoder(PlainSimpleAgent):
     model: Annotated[LLMFactory, resource(category="llm", rid="llm")]
-    
-    def __init__(self):
-        super().__init__()
-        self.add_sysprompt("You are a helpful assistant")
-    
-    def __execute__(self, task_context: str):
-        # Custom implementation
-        response = self.get_chat_model("model").invoke([...])
-        return StateResult.NEXT, response.content
+    tool_aligner: Annotated[ToolAlignerFactory, resource(category="tool_aligner", rid="tool_aligner")]
+    python_coder_prompt: Annotated[SysPromptFactory, resource(category="sysprompt", rid="python_coder_prompt")]
+    python_workspace: Annotated[PythonWorkSpaceFactory, ToolsDefinition(name="python_workspace", bind_to="model")] = PythonWorkSpaceFactory()
+
+    def __init__(self, sys_prompt: str = None, workspace_path: str = "./workspace", use_venv: bool = False):
+        tool_args = {
+            "python_workspace": {
+                "path": workspace_path,
+                "create_venv": use_venv
+            }
+        }
+        super().__init__(model_name="model", sys_prompt=sys_prompt or "", tool_args=tool_args)
+        self.define_output_schema(schema_validator={
+            "type": "object",
+            "properties": {
+                "script_path" : {"type": "string"},
+                "script_args" : {"type": "array", "items": {"type": "string"}},
+                "script_output" : {"type": "string"},
+                "is_interactive" : {"type": "boolean"},
+                "summarization" : {"type": "string"}
+            }
+        },
+        schema={
+            "script_path": "path to the created script",
+            "script_args": "arguments for the created script",
+            "script_output": "output of the created script",
+            "is_interactive": "indicates if the created script is interactive",
+            "summarization": "summarization of the created script"
+        })
+        if hasattr(self, "python_coder_prompt") and self.python_coder_prompt:
+             self.add_sysprompt(self.python_coder_prompt)
 ```
 
 ## Key Features
@@ -152,24 +170,81 @@ fsm.run(initial_state="planning")
 
 ## Configuration
 
-Define resources in `config/config.yaml`:
+Example:
 
 ```yaml
-resources:
-  llm:
+rresources:
+  main_llm:
+    category: llm
     type: ollama
-    host: http://localhost:11434
-    model: llama2
-  
-  embeddings:
-    type: fastembed
-    model_name: BAAI/bge-small-en-v1.5
+    host: "http://localhost:11434"
+    model: "granite4:3b"
+    induced_tools: True
+
+  gemma12b:
+    category: llm
+    type: ollama
+    host: "http://localhost:11434"
+    model: "gemma3:12b"
+    induced_tools: True
+
+  deepseek:
+    category: llm
+    type: ollama
+    host: "http://localhost:11434"
+    model: "deepseek-r1:7b"
+    induced_tools: True
+    thinking: True
+
+  lfm_thinking:
+    category: llm
+    type: ollama
+    host: "http://localhost:11434"
+    model: "lfm2.5-thinking:1.2b"
+    induced_tools: True
+    thinking: True
+
+  granite:
+    category: llm
+    type: ollama
+    host: "http://localhost:11434"
+    model: "granite4:3b"
+    induced_tools: True
+    
+  verification_pre_sysprompt:
+    category: sysprompt
+    type: sysprompt
+    source: "verifier.prompt"
+    
+  python_coder_prompt:
+    category: sysprompt
+    type: sysprompt
+    source: "python_coder.prompt"
+
+  python_tester_prompt:
+    category: sysprompt
+    type: sysprompt
+    source: "tester.prompt"
+
+  main_tool_aligner:
+    category: tool_aligner
+    type: tool_aligner
+    model_name: "BAAI/bge-small-en-v1.5"
+    threads: 2
+    tool_name_lexical_threshold: 0.8
+    tool_name_semantic_threshold: 0.5
+    tool_args_lexical_threshold: 0.8
+    tool_args_semantic_threshold: 0.6
+
 
 users:
-  my_agent:
-    type: agent.simple.Simple
+  python_coder:
+    module: pipiline_agent.agent.simple
+    class: PythonCoder
     resources:
-      llm: llm
+      llm: gemma12b
+      python_coder_prompt: python_coder_prompt
+      tool_aligner: main_tool_aligner
 ```
 
 ## Requirements

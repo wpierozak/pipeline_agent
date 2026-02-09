@@ -10,15 +10,15 @@ The `core` module corresponds to the foundational components of the Agent Framew
 
 The framework uses a dependency injection-style pattern to provide external resources (like LLMs and Embeddings) to agents.
 
-### `ResourceProvider` (`ResourceProvider.py`)
-the `ResourceProvider` is the central registry and factory for resources.
+### `ResourceProvider` (`resources.py`)
+The `ResourceProvider` is the central registry and factory for resources.
 - **Config-Driven**: Reads user configuration (e.g., from `config.yaml` or a dict) to understand available resources.
 - **Initialization**:
   - `initialize_users()`: Iterates through all users defined in `config.yaml` to instantiate and configure them.
   - `initialize_user(name)`: Instantiates a specific user by name.
 - **Injection**: It inspects the `ResourceUser` (Agent) class for `Annotated` members requiring resources and injects them if `rid` (Resource ID) matches the config.
 
-### `ResourceUser` (`ResourceUser.py`)
+### `ResourceUser` (`resources.py`)
 A base class for any component (Agent, Tool) that needs access to resources.
 - **Declarative Dependencies**: Users declare resources using Python's `Annotated` syntax:
   ```python
@@ -31,15 +31,13 @@ A base class for any component (Agent, Tool) that needs access to resources.
 
 ### `BaseAgent` (`agents.py`)
 Base class that combines `ResourceUser` and `ToolUser` to create an executable Agent within the FSM.
-- **`@agentcall` Decorator**: Marks a specific method as the entry point for the agent's logic (in `AgentProvider` mixin).
-  ```python
-  @agentcall(name="planning-step")
-  def plan(self, task_context, subscribed_mess, history_prompt): ...
-  ```
-- **Execution**: The `execute_agent` method dispatches calls to the decorated method, handling context formatting and error signaling.
+- **Method Override Pattern**: Subclasses **must override** the `__execute__(self, task_context: str)` method to implement agent-specific logic.
+- **Execution**: The `execute_agent` method dispatches calls to the overridden `__execute__` method, handling context formatting and error signaling.
+- **Tool Integration**: The `_connect_tools` method iterates over all tool sources, extracts individual tools, registers them, and binds them to the target model.
+- **Socket-Based Communication**: Agents can subscribe to specific memory channels via `AgentSocket` to coordinate with other agents.
 
-### `ToolProvider` (`ToolProvider.py`)
-A mixin for exposing methods as LangChain `StructuredTool` objects.
+### `ToolProvider` (`tools.py`)
+A mixin for exposing methods as callable tools with proper schema validation.
 - **`@toolmethod` Decorator**: Marks methods to be exposed as tools.
   ```python
   @toolmethod(name="search_web")
